@@ -1,1 +1,285 @@
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Orthonormal Basis Finder</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --bg: #f8fafc;
+  --card: #ffffff;
+  --text: #0f172a;
+  --muted: #64748b;
+  --primary: #6366f1; /* Blue accent for title */
+  --primary-hover: #4f46e5;
+  --accent: #eef2ff;
+  --radius: 14px;
+  --transition: 0.3s ease;
+}
+
+body[data-theme="dark"] {
+  --bg: #020617;
+  --card: #0f172a;
+  --text: #e5e7eb;
+  --muted: #94a3b8;
+  --accent: #1e293b;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  padding: 40px 16px;
+}
+
+.app {
+  max-width: 960px;
+  margin: auto;
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 32px;
+  box-shadow: 0 20px 40px rgba(0,0,0,.15);
+}
+
+header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+
+h1 {
+  margin: 0;
+  color: var(--primary);
+  font-size: 2rem;
+  text-align: center;
+}
+
+.subtitle {
+  color: var(--muted);
+  font-size: 1rem;
+  text-align: center;
+}
+
+.description {
+  color: var(--text);
+  font-size: 0.95rem;
+  text-align: center;
+  max-width: 700px;
+}
+
+.toggle {
+  border: none;
+  background: var(--accent);
+  padding: 8px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px,1fr));
+  gap: 16px;
+  margin: 28px 0;
+}
+
+label {
+  font-size: .85rem;
+  display: block;
+  margin-bottom: 6px;
+}
+
+input {
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--text);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+}
+
+th, td {
+  padding: 10px;
+  text-align: center;
+  border-bottom: 1px solid var(--accent);
+}
+
+th {
+  background: var(--accent);
+  font-weight: 600;
+}
+
+.vector-label {
+  font-weight: 600;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+button {
+  border: none;
+  padding: 10px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.primary {
+  background: var(--primary);
+  color: white;
+}
+
+.primary:hover {
+  background: var(--primary-hover);
+}
+
+.secondary {
+  background: var(--accent);
+  color: var(--text);
+}
+
+.step {
+  background: var(--accent);
+  padding: 14px;
+  border-radius: 10px;
+  margin-top: 12px;
+}
+
+.math {
+  font-family: monospace;
+}
+</style>
+</head>
+
+<body data-theme="light">
+<main class="app">
+<header>
+  <div>
+    <h1>Orthonormal Basis Finder</h1>
+    <p class="subtitle">Visual Gram–Schmidt Process</p>
+    <p class="description">
+      Enter a set of vectors and their dimensions below, then visualize the Gram–Schmidt process to generate an orthonormal basis. Ideal for learning linear algebra and understanding vector projections.
+    </p>
+  </div>
+  <button class="toggle" id="themeToggle">🌙 Dark</button>
+</header>
+
+<section class="controls">
+  <div>
+    <label>Number of Vectors (1–7)</label>
+    <input type="number" id="numVectors" min="1" max="7" value="3">
+  </div>
+  <div>
+    <label>Vector Dimension (1–7)</label>
+    <input type="number" id="vectorSize" min="1" max="7" value="3">
+  </div>
+</section>
+
+<section id="vectors"></section>
+
+<div class="actions">
+  <button class="primary" id="compute">Animate Gram–Schmidt</button>
+  <button class="secondary" onclick="location.reload()">Reset</button>
+</div>
+
+<section id="steps"></section>
+</main>
+
+<script>
+const vectorsEl = document.getElementById("vectors");
+const stepsEl = document.getElementById("steps");
+const numVectors = document.getElementById("numVectors");
+const vectorSize = document.getElementById("vectorSize");
+
+/* Dark mode toggle */
+document.getElementById("themeToggle").onclick = () => {
+  const dark = document.body.dataset.theme === "dark";
+  document.body.dataset.theme = dark ? "light" : "dark";
+  document.getElementById("themeToggle").textContent = dark ? "🌙 Dark" : "☀️ Light";
+};
+
+/* Render vector table with subscripts */
+function renderTable() {
+  vectorsEl.innerHTML = "";
+
+  const table = document.createElement("table");
+  const thead = document.createElement("thead");
+  const headRow = document.createElement("tr");
+
+  headRow.innerHTML = `<th>Vector</th>`;
+  for (let j = 0; j < vectorSize.value; j++) {
+    headRow.innerHTML += `<th>x<sub>${j + 1}</sub></th>`;
+  }
+  thead.appendChild(headRow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
+
+  for (let i = 0; i < numVectors.value; i++) {
+    const row = document.createElement("tr");
+    row.innerHTML = `<td class="vector-label">v<sub>${i + 1}</sub></td>`;
+    for (let j = 0; j < vectorSize.value; j++) {
+      row.innerHTML += `<td><input type="number"></td>`;
+    }
+    tbody.appendChild(row);
+  }
+
+  table.appendChild(tbody);
+  vectorsEl.appendChild(table);
+}
+
+numVectors.addEventListener("input", renderTable);
+vectorSize.addEventListener("input", renderTable);
+renderTable();
+
+/* Animate Gram–Schmidt steps */
+document.getElementById("compute").onclick = () => {
+  stepsEl.innerHTML = "";
+  let delay = 0;
+
+  for (let i = 0; i < numVectors.value; i++) {
+    setTimeout(() => {
+      const step = document.createElement("div");
+      step.className = "step";
+      step.innerHTML = `
+        <strong>Step ${i + 1}</strong>
+        <div class="math">
+          u<sub>${i + 1}</sub> = v<sub>${i + 1}</sub> − Σ proj<sub>u<sub>k</sub></sub>(v<sub>${i + 1}</sub>)
+        </div>`;
+      stepsEl.appendChild(step);
+    }, delay);
+    delay += 600;
+  }
+
+  setTimeout(() => {
+    const step = document.createElement("div");
+    step.className = "step";
+    step.innerHTML = `
+      <strong>Normalization</strong>
+      <div class="math">
+        e<sub>i</sub> = u<sub>i</sub> / ||u<sub>i</sub>||
+      </div>`;
+    stepsEl.appendChild(step);
+  }, delay + 300);
+};
+</script>
+</body>
+</html>
+
